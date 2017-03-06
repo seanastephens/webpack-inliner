@@ -41,7 +41,9 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
 
         if(module.dependencies.length > 0) {
           const estimate = module.dependencies.length / 2;
-          return quitWithMessage(`It has dependencies (estimated ${estimate}).`);
+          return quitWithMessage(
+            `It has dependencies (estimated ${estimate} imports).`
+          );
         }
 
         const inlineCandidate = compilation.getModule(module);
