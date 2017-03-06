@@ -59,10 +59,9 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
         const relevantRequire = dep => dep.request === inlineCandidate.rawRequest;
 
         if(sortedDeps.filter(relevantRequire).length != 1) {
-          // Being extra conservative here: If the import happens twice,
-          // we can't inline because that would duplicate module
-          // state/side effects. If it happens zero times, well,
-          // something else is wrong.
+          // Being extra conservative here: If the import happens twice, we
+          // can't inline because that would duplicate module state/side
+          // effects. If it happens zero times, well, something else is wrong.
           logReason([
             'Receiver candidate imported the inline candidate',
             `${pairs.length} times, needs to be one.`
@@ -91,7 +90,8 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
 
         console.log('Inlining', module.rawRequest, 'into', requirers[0].rawRequest);
 
-        // We need to insert a statement after 'use strict';
+        // We need to insert a statement after 'use strict', so we take it out
+        // and then put it back in after.
         const insert = inlineCandidate._source.source()
           .replace(/['"]use strict['"];/g, '')
           .replace('module.exports', 'exports');
@@ -104,6 +104,13 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
           '  return exports;',
           '})()'
         ].join('\n');
+
+        // The deps cover the ranges marked by '^', but we want to replace
+        // the range covered by 'x':
+        //
+        // const foo = require('bar');
+        //             ^^^^^^^ ^^^^^
+        //             xxxxxxxxxxxxxx
 
         const range = [webpackHeaderDep.range[0], moduleIdDep.range[1] + 1];
 
