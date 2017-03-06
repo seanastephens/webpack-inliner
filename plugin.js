@@ -56,13 +56,14 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
         const byPosition = (a, b) => a.range[0] - b.range[0];
         const sortedDeps = receiver.dependencies.slice().sort(byPosition);
         const pairs = sortedDeps
-          .map((x, i) => [x, i])
-          .filter(x => x[0].type === 'cjs require')
-          .map(x => ({
-            moduleIdDep: x[0],
-            webpackHeaderDep: sortedDeps[x[1]-1]
+          .map((dep, index) => ({ dep, index }))
+          .filter(({ dep }) => dep.type === 'cjs require')
+          .map(({ dep, index }) => ({
+            moduleIdDep: dep,
+            webpackHeaderDep: sortedDeps[index - 1]
           }))
-          .filter(dep => dep.moduleIdDep.request === inlineCandidate.rawRequest);
+          .filter(({ moduleIdDep }) =>
+            moduleIdDep.request === inlineCandidate.rawRequest);
 
         if(pairs.length !== 1) {
           // Being extra conservative here: If the import happens twice,
@@ -75,17 +76,17 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
           ].join(' '));
         }
 
-        const pair = pairs[0];
+        const { webpackHeaderDep, moduleIdDep } = pairs[0];
 
-        const pairIsAdjacent = pair.webpackHeaderDep.range[1] === pair.moduleIdDep.range[0] - 1;
+        const depsAreAdjacent = webpackHeaderDep.range[1] === moduleIdDep.range[0] - 1;
 
-        if(!pairIsAdjacent) {
-          return quitWithMessage(`Sanity check failed: pairIsAdjacent=${pairIsAdjacent}`);
+        if(!depsAreAdjacent) {
+          return quitWithMessage(`Sanity check failed: pairIsAdjacent=${depsAreAdjacent}`);
         }
 
         console.log('Inlining', module.rawRequest, 'into', requirers[0].rawRequest);
 
-        const range = [pair.webpackHeaderDep.range[0], pair.moduleIdDep.range[1] + 1];
+        const range = [webpackHeaderDep.range[0], moduleIdDep.range[1] + 1];
 
         // We need to insert a statement after 'use strict';
         const insert = inlineCandidate._source.source()
@@ -94,17 +95,17 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
 
         const inlineModuleDefinition = [
           '(function() {',
-          '"use strict";',
-          'var exports = {};',
-          insert,
-          'return exports;',
+          '  "use strict";',
+          '  var exports = {};',
+          `  ${insert}`,
+          '  return exports;',
           '})()'
         ].join('\n');
 
         receiver.addDependency(new ConstDependency(inlineModuleDefinition, range));
 
         receiver.dependencies = receiver.dependencies.filter(dep => {
-          return dep != pair.moduleIdDep && dep != pair.webpackHeaderDep;
+          return ![moduleIdDep, webpackHeaderDep].includes(dep);
         });
 
         deadModules.add(inlineCandidate.identifier());
