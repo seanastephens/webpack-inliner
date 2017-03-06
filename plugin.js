@@ -20,18 +20,18 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
     const deadModules = new Set();
 
     compilation.plugin('optimize-modules', modules => {
-      const refMap = new Map();
+      const moduleToRequirers = new Map();
       modules.forEach(sourceModule => {
         sourceModule.dependencies.forEach(({ module }) => {
           if(module !== null) {
-            const refs = refMap.get(module) || [];
+            const refs = moduleToRequirers.get(module) || [];
             refs.push(sourceModule);
-            refMap.set(module, refs);
+            moduleToRequirers.set(module, refs);
           }
         });
       });
 
-      refMap.forEach((requirers, module) => {
+      moduleToRequirers.forEach((requirers, module) => {
 
         const quitWithMessage = makeQuitter(requirers, module);
 
