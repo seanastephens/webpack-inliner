@@ -10,11 +10,11 @@ const makeQuitter = (requirers, module) => message =>
     message
   );
 
-function HelloWorldPlugin(options) {
+function LeafModuleInlinerPlugin(options) {
 
 }
 
-HelloWorldPlugin.prototype.apply = function(compiler) {
+LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
 
   compiler.plugin('compilation', compilation => {
     const deadModules = new Set();
@@ -121,4 +121,4 @@ HelloWorldPlugin.prototype.apply = function(compiler) {
   });
 }
 
-module.exports = HelloWorldPlugin;
+module.exports = LeafModuleInlinerPlugin;
