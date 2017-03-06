@@ -55,17 +55,10 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
 
         const byPosition = (a, b) => a.range[0] - b.range[0];
         const sortedDeps = receiver.dependencies.slice().sort(byPosition);
-        const pairs = sortedDeps
-          .map((dep, index) => ({ dep, index }))
-          .filter(({ dep }) => dep.type === 'cjs require')
-          .map(({ dep, index }) => ({
-            moduleIdDep: dep,
-            webpackHeaderDep: sortedDeps[index - 1]
-          }))
-          .filter(({ moduleIdDep }) =>
-            moduleIdDep.request === inlineCandidate.rawRequest);
+        const relevantRequire =
+          dep => dep.request === inlineCandidate.rawRequest;
 
-        if(pairs.length !== 1) {
+        if(sortedDeps.filter(relevantRequire).length != 1) {
           // Being extra conservative here: If the import happens twice,
           // we can't inline because that would duplicate module
           // state/side effects. If it happens zero times, well,
@@ -76,7 +69,16 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
           ].join(' '));
         }
 
-        const { webpackHeaderDep, moduleIdDep } = pairs[0];
+        const moduleIdDepIndex = sortedDeps.findIndex(relevantRequire);
+        const moduleIdDep = sortedDeps[moduleIdDepIndex];
+        const webpackHeaderDep = sortedDeps[moduleIdDepIndex - 1];
+
+        if(moduleIdDep.type !== 'cjs require') {
+          return quitWithMessage([
+            'Sanity check failed:',
+            `moduleIdDep.type === ${moduleIdDep.type} !== 'cjs require',`,
+          ].join(' '));
+        }
 
         const depsAreAdjacent = webpackHeaderDep.range[1] === moduleIdDep.range[0] - 1;
 
@@ -85,8 +87,6 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
         }
 
         console.log('Inlining', module.rawRequest, 'into', requirers[0].rawRequest);
-
-        const range = [webpackHeaderDep.range[0], moduleIdDep.range[1] + 1];
 
         // We need to insert a statement after 'use strict';
         const insert = inlineCandidate._source.source()
@@ -102,8 +102,11 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
           '})()'
         ].join('\n');
 
+        const range = [webpackHeaderDep.range[0], moduleIdDep.range[1] + 1];
+
         receiver.addDependency(new ConstDependency(inlineModuleDefinition, range));
 
+        // Discard the import that we replaced with the inlined module.
         receiver.dependencies = receiver.dependencies.filter(dep => {
           return ![moduleIdDep, webpackHeaderDep].includes(dep);
         });
