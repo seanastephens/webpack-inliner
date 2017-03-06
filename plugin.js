@@ -56,8 +56,7 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
 
         const byPosition = (a, b) => a.range[0] - b.range[0];
         const sortedDeps = receiver.dependencies.slice().sort(byPosition);
-        const relevantRequire =
-          dep => dep.request === inlineCandidate.rawRequest;
+        const relevantRequire = dep => dep.request === inlineCandidate.rawRequest;
 
         if(sortedDeps.filter(relevantRequire).length != 1) {
           // Being extra conservative here: If the import happens twice,
