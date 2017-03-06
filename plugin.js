@@ -1,6 +1,6 @@
 const ConstDependency = require('webpack/lib/dependencies/ConstDependency');
 
-const makeQuitter = (requirers, module) => message =>
+const makeLogger = (requirers, module) => message =>
   console.log(
     'Not inlining',
     module.rawRequest,
@@ -33,24 +33,25 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
 
       moduleToRequirers.forEach((requirers, module) => {
 
-        const quitWithMessage = makeQuitter(requirers, module);
+        const logReason = makeLogger(requirers, module);
 
         if(requirers.length > 1) {
-          return quitWithMessage(`Imported ${requirers.length} > 1 times.`);
+          logReason(`Imported ${requirers.length} > 1 times.`);
+          return;
         }
 
         if(module.dependencies.length > 0) {
           const estimate = module.dependencies.length / 2;
-          return quitWithMessage(
-            `It has dependencies (estimated ${estimate} imports).`
-          );
+          logReason(`It has dependencies (estimated ${estimate} imports).`);
+          return;
         }
 
         const inlineCandidate = compilation.getModule(module);
         const receiver = compilation.getModule(requirers[0]);
 
         if(!inlineCandidate._source) {
-          return quitWithMessage('Can\'t find source of inline candidate.');
+          logReason('Can\'t find source of inline candidate.');
+          return;
         }
 
         const byPosition = (a, b) => a.range[0] - b.range[0];
@@ -63,10 +64,11 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
           // we can't inline because that would duplicate module
           // state/side effects. If it happens zero times, well,
           // something else is wrong.
-          return quitWithMessage([
+          logReason([
             'Receiver candidate imported the inline candidate',
             `${pairs.length} times, needs to be one.`
           ].join(' '));
+          return;
         }
 
         const moduleIdDepIndex = sortedDeps.findIndex(relevantRequire);
@@ -74,16 +76,18 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
         const webpackHeaderDep = sortedDeps[moduleIdDepIndex - 1];
 
         if(moduleIdDep.type !== 'cjs require') {
-          return quitWithMessage([
+          logReason([
             'Sanity check failed:',
             `moduleIdDep.type === ${moduleIdDep.type} !== 'cjs require',`,
           ].join(' '));
+          return;
         }
 
         const depsAreAdjacent = webpackHeaderDep.range[1] === moduleIdDep.range[0] - 1;
 
         if(!depsAreAdjacent) {
-          return quitWithMessage(`Sanity check failed: pairIsAdjacent=${depsAreAdjacent}`);
+          logReason(`Sanity check failed: pairIsAdjacent=${depsAreAdjacent}`);
+          return;
         }
 
         console.log('Inlining', module.rawRequest, 'into', requirers[0].rawRequest);
