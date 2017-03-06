@@ -125,10 +125,9 @@ LeafModuleInlinerPlugin.prototype.apply = function(compiler) {
 
       });
 
-      const shouldDiscard = x => deadModules.has(x.identifier());
       compilation.chunks.forEach(chunk => {
         chunk.modules
-          .filter(shouldDiscard)
+          .filter(x => deadModules.has(x.identifier()))
           .forEach(module => chunk.removeModule(module));
       });
 
